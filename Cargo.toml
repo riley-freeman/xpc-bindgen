@@ -2,6 +2,13 @@
 name = "xpc-bindgen"
 version = "26.0.0"
 edition = "2024"
+description = "Rust bindings to Apple's libXPC"
+documentation = "https://developer.apple.com/documentation/xpc"
+repository = "https://github.com/riley-freeman/xpc-bindgen"
+license = "Apache-2.0"
+license-file = "LICENSE-APACHE.txt"
+keywords = ["XPC", "Apple", "IPC"]
+readme = "README.md"
 
 [dependencies]
 
