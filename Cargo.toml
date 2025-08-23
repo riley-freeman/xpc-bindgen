@@ -1,6 +1,6 @@
 [package]
 name = "xpc-bindgen"
-version = "26.0.0"
+version = "26.0.1"
 edition = "2024"
 description = "Rust bindings to Apple's libXPC"
 documentation = "https://developer.apple.com/documentation/xpc"
