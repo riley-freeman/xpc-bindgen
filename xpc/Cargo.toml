@@ -1,0 +1,16 @@
+[package]
+name = "xpc"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+readme.workspace = true
+
+[dependencies]
+xpc-bindgen = { path = "../xpc-bindgen" }
+
+bitflags.workspace = true
+objc.workspace = true

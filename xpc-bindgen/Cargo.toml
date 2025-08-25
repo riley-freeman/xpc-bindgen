@@ -1,0 +1,15 @@
+[package]
+name = "xpc-bindgen"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+readme.workspace = true
+
+[dependencies]
+
+[build-dependencies]
+bindgen.workspace = true

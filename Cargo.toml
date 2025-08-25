@@ -1,17 +1,22 @@
-[package]
-name = "xpc-bindgen"
+[workspace.package]
+name = "xpc-rs"
 version = "26.0.1"
 edition = "2024"
 description = "Rust bindings to Apple's libXPC"
 documentation = "https://developer.apple.com/documentation/xpc"
 repository = "https://github.com/riley-freeman/xpc-bindgen"
 license = "Apache-2.0"
-license-file = "LICENSE-APACHE.txt"
 keywords = ["XPC", "Apple", "IPC"]
 readme = "README.md"
 
-[dependencies]
+[workspace]
+members = [ 
+    "xpc",
+    "xpc-bindgen"
+]
 
-[build-dependencies]
+[workspace.dependencies]
+bitflags = "2.9.3"
 bindgen = "0.72.0"
+objc = "0.2.7"
 
