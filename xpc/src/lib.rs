@@ -1,4 +1,5 @@
 pub mod connection;
+pub mod event;
 pub mod error;
 
 #[macro_use]
