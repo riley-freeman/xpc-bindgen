@@ -45,7 +45,7 @@ struct XPCConnectionInner {
     delegate: Option<Box<dyn XPCConnectionDelegate>>,
 }
 
-extern "C" fn main_xpc_event_handler(connection: XPCConnectionWeak, os_event: xpc_object_t) {
+extern "C" fn main_xpc_event_handler(connection: &XPCConnectionWeak, os_event: xpc_object_t) {
     match connection.upgrade() {
         Some(inner) => {
             let connection: XPCConnection   = XPCConnection { inner };
@@ -56,7 +56,6 @@ extern "C" fn main_xpc_event_handler(connection: XPCConnectionWeak, os_event: xp
     }
 }
 
-#[repr(C)]
 type XPCConnectionWeak = Weak<Mutex<XPCConnectionInner>>;
 
 #[derive(Clone)]
@@ -65,30 +64,38 @@ pub struct XPCConnection {
 }
 
 impl XPCConnection {
-    pub fn create(name: &str) -> Result<Self, Error> {
+    pub fn create(n: &str) -> Result<Self, Error> {
         // Make sure the string is zero terminating
-        let name = os_str::OsString::from(name);
+        let name = os_str::OsString::from(n);
         let handle = unsafe { xpc_connection_create(
             name.as_bytes().as_ptr() as _, 
             std::ptr::null_mut()
         ) };
 
-        XPCConnection::finish_setup(handle)
+        if handle.is_null() {
+            return Err(Error::FailedToCreateConnection(String::from(n)))
+        }
+
+        Ok(XPCConnection::finish_setup(handle))
     }
 
-    pub fn create_mach_service(name: &str, options: ConnectionOptions) -> Result<Self, Error> {
+    pub fn create_mach_service(n: &str, options: ConnectionOptions) -> Result<Self, Error> {
         // Make sure the string is zero terminating
-        let name = os_str::OsString::from(name);
+        let name = os_str::OsString::from(n);
         let handle = unsafe { xpc_connection_create_mach_service(
             name.as_bytes().as_ptr() as _,
             std::ptr::null_mut(),
             options.bits(),
         ) };
 
-        XPCConnection::finish_setup(handle)
+        if handle.is_null() {
+            return Err(Error::FailedToCreateConnection(String::from(n)))
+        }
+
+        Ok(XPCConnection::finish_setup(handle))
     }
 
-    fn finish_setup(handle: xpc_connection_t) -> Result<Self, Error> {
+    fn finish_setup(handle: xpc_connection_t) -> Self {
         let inner = XPCConnectionInner {
             handle,
             delegate: None,
@@ -102,7 +109,7 @@ impl XPCConnection {
         let connection_weak = Arc::downgrade(&inner);
 
         let event_callback = Box::new(move |os_event: xpc_object_t| {
-            main_xpc_event_handler(connection_weak.clone(), os_event);
+            main_xpc_event_handler(&connection_weak, os_event);
         });
         unsafe {
             xpc_connection_set_event_handler(
@@ -112,14 +119,13 @@ impl XPCConnection {
         }
 
         connection.inner.lock().unwrap().event_callback = event_callback;
-
-        Ok(connection)
+        connection
     }
 
     pub fn activate(&mut self) {
         let conn = self.inner.lock().unwrap();
         // Apple recommends using active for newer apps
-        if crate::VERSION.at_least((10, 12), (10, 0)) {
+        if crate::utils::VERSION.at_least((10, 12), (10, 0)) {
             unsafe { xpc_connection_activate(conn.handle); }
         } else {
             unsafe { xpc_connection_resume(conn.handle); }
@@ -146,6 +152,12 @@ impl XPCConnection {
         if let Some(delegate) = &conn.delegate {
             delegate.handle_event(event);
         }
+    }
+}
+
+impl From<xpc_connection_t> for XPCConnection {
+    fn from(handle: xpc_connection_t) -> Self {
+        Self::finish_setup(handle)   
     }
 }
 
