@@ -1,12 +1,19 @@
 use std::ffi::os_str;
+use std::ffi::CStr;
+use std::ffi::OsString;
 use std::fmt::Debug;
-use std::mem;
 use std::mem::MaybeUninit;
 use std::os::unix::ffi::OsStrExt;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::Weak;
 
+use ron::Value;
+use xpc_bindgen::xpc_connection_send_message;
+use xpc_bindgen::xpc_connection_send_message_with_reply_sync;
+use xpc_bindgen::xpc_dictionary_create;
+use xpc_bindgen::xpc_dictionary_get_string;
+use xpc_bindgen::xpc_dictionary_set_string;
 use xpc_bindgen::xpc_object_t;
 use xpc_bindgen::xpc_connection_t;
 
@@ -21,7 +28,6 @@ use xpc_bindgen::xpc_connection_suspend;
 use xpc_bindgen::xpc_connection_cancel;
 
 use crate::error::Error;
-use crate::event::XPCEvent;
 
 use bitflags::bitflags;
 
@@ -48,11 +54,46 @@ struct XPCConnectionInner {
 extern "C" fn main_xpc_event_handler(connection: &XPCConnectionWeak, os_event: xpc_object_t) {
     match connection.upgrade() {
         Some(inner) => {
-            let connection: XPCConnection   = XPCConnection { inner };
-            let event: XPCEvent             = unsafe { mem::transmute(os_event) };
-            connection.handle_event(&event);
+            let connection: XPCConnection = XPCConnection { inner };
+            let event = retrieve_r_data(os_event);
+            connection.handle_event(event);
         },
         None => return // TODO: Logging something went wrong
+    }
+}
+
+fn retrieve_r_data(os_event: xpc_object_t) -> Value {
+    let key = OsString::from("R_DATA");
+    let value = unsafe {
+        let ptr = xpc_dictionary_get_string(
+            os_event,
+            key.as_bytes().as_ptr() as _
+        );
+        let value = CStr::from_ptr(ptr);
+        String::from_utf8_unchecked(value.to_bytes().to_vec())
+    };
+
+    ron::from_str(&value).unwrap()
+}
+
+fn build_message_dictionary(message: &Value) -> xpc_object_t {
+    let key = OsString::from("R_DATA");
+
+    let data = ron::to_string(message).unwrap();
+    let data = OsString::from(data);
+
+    unsafe {
+        let dict = xpc_dictionary_create(
+            std::ptr::null(), 
+            std::ptr::null(),
+            0
+        );
+        xpc_dictionary_set_string (
+            dict,
+            key.as_bytes().as_ptr() as _,
+            data.as_bytes().as_ptr() as _,
+        );
+        dict
     }
 }
 
@@ -147,7 +188,41 @@ impl XPCConnection {
         unsafe { xpc_connection_cancel(conn.handle); }
     }
 
-    fn handle_event(&self, event: &XPCEvent) {
+    pub fn send_message(&self, message: &Value) -> Result<(), crate::error::Error> {
+        let lock = self.inner.lock().unwrap();
+
+        unsafe {
+            let dictionary = build_message_dictionary(message);
+            if dictionary.is_null() {
+                return Err(Error::DeviceOutOfMemory);
+            }
+
+            xpc_connection_send_message(lock.handle, dictionary);
+        }
+
+        Ok(())
+    }
+
+    // TODO: Something with tokio or smth to make this async maybe
+    pub fn send_message_with_reply(&self, message: &Value) -> Result<Value, crate::error::Error> {
+        let lock = self.inner.lock().unwrap();
+
+        unsafe {
+            let dictionary = build_message_dictionary(message);
+            if dictionary.is_null() {
+                return Err(Error::DeviceOutOfMemory);
+            }
+            let xpc_response = xpc_connection_send_message_with_reply_sync(
+                lock.handle,
+                dictionary
+            );
+
+            let response = retrieve_r_data(xpc_response);
+            Ok(response)
+        }
+    }
+
+    fn handle_event(&self, event: Value) {
         let conn = self.inner.lock().unwrap();
         if let Some(delegate) = &conn.delegate {
             delegate.handle_event(event);
@@ -162,7 +237,7 @@ impl From<xpc_connection_t> for XPCConnection {
 }
 
 pub trait XPCConnectionDelegate: Debug {
-    fn handle_event(&self, event: &XPCEvent) {
+    fn handle_event(&self, event: Value) {
         // Force the event paramater to be used
         let _event = event;
     }

@@ -1,6 +1,4 @@
-use xpc_bindgen::xpc_object_t;
+use serde::{Deserialize, Serialize};
 
-pub struct XPCEvent {
-    _handle: xpc_object_t,
-}
+pub trait XPCEvent<'a>: Serialize + Deserialize<'a> {}
 

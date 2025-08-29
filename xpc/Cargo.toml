@@ -14,3 +14,5 @@ xpc-bindgen = { path = "../xpc-bindgen" }
 
 bitflags.workspace = true
 objc.workspace = true
+serde.workspace = true
+ron.workspace = true

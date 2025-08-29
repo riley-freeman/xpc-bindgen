@@ -19,4 +19,6 @@ resolver = "3"
 bitflags = "2.9.3"
 bindgen = "0.72.0"
 objc = "0.2"
+serde = "1.0.219"
+ron = "0.11.0"
 

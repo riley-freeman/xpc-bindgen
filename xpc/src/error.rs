@@ -2,6 +2,7 @@
 #[derive(Debug)]
 pub enum Error {
     FailedToCreateConnection(String),
+    DeviceOutOfMemory,
 }
 
 impl std::error::Error for Error {}
@@ -11,5 +12,3 @@ impl std::fmt::Display for Error {
         write!(f, "{:?}", self)
     }
 }
-
-
